@@ -1,0 +1,5 @@
+&MAIN_PARM
+  NDIM  = 1000000, 
+  NTIME = 50000
+/
+
