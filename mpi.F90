@@ -1,4 +1,4 @@
-! _/_/_/ Simple Benchmark Program  Ver 2.0 _/_/_/
+! _/_/_/ Simple Benchmark Program  Ver 2.1 _/_/_/
 ! Copyright Y.Hirokawa
 
 program main
@@ -8,8 +8,8 @@ program main
   integer              :: n, i, nsize, Iseed, Ndim, Ntime
   integer              :: buf(2)
   integer, allocatable :: iarray(:)
-  double precision     :: dn
-  double precision, allocatable :: a(:), b(:), c(:)
+  double precision     :: dn, a1, btmp 
+  double precision, allocatable :: a(:), b(:), atmp(:)
   integer :: ista, iend
   integer :: ierr, nprocs, myrank
   namelist /MAIN_PARM/ Ndim,  &
@@ -34,11 +34,11 @@ program main
   Ndim  = buf(1)
   Ntime = buf(2)
   Iseed = myrank + 1
-  write(*,*) "[INFO] Myrank=",myrank," Ndim=",Ndim," Ntime=",Ntime, "Iseed=",Iseed
+  write(*,*) "[INFO] myrank=",myrank,"Ndim=",Ndim," Ntime=",Ntime, "Iseed=",Iseed
 !
   ista = (NDIM/nprocs)*myrank + 1
   iend = ista + NDIM/nprocs   - 1
-  if(iend > NDIM) iend = NDIM
+  if(myrank == nprocs-1  .and.  iend /= NDIM) iend = NDIM
 !
 ! === Set Pseudo Random Number ===
   call random_seed(size=nsize)
@@ -47,23 +47,31 @@ program main
   call random_seed(put=iarray) 
   deallocate(iarray)
 !
-!!!DBG  write(*,*) "myrank,ista,iend=", myrank, ista, iend
+!!!DBG  write(*,*) "[DBG] myrank,ista,iend=", myrank, ista, iend
 !
 ! === Memory Allocation ===
-  allocate(a(1:Ndim), b(ista:iend), c(1:Ndim))
+  allocate(a(1:Ndim), b(ista:iend), atmp(1:Ndim))
 !
 ! === Initialize Variables ===
-  a(:) = 0.0d0
+  a(:)    = 0.0d0
+  atmp(:) = 0.0d0
   call random_number(b)
 !
+! === Broadcast the Coefficient ===
+  if(myrank == 0) btmp = b(1)
+  call MPI_Bcast(btmp, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+!
 ! === Calculation ===
-!$ACC DATA COPYIN(b), COPYOUT(a)
+  a1 = 0.0d0
+!$ACC DATA COPYIN(b,a1), COPY(atmp)
   do n = 1, Ntime
-    dn = dble(n) + a(1)
+!   ### Calculate the coeciffient in each MPI process ###
+    dn = dble(n) + a1
+    a1 = dn*btmp + 2.0d0
 !$OMP PARALLEL DO PRIVATE(i,ista,iend)
 !$ACC KERNELS
     do i = ista, iend 
-       a(i) = dn*b(i) + 2.0d0 
+       atmp(i) = dn*b(i) + 2.0d0 
     enddo
 !$ACC END KERNELS
 !$OMP BARRIER
@@ -71,18 +79,20 @@ program main
 !$ACC END DATA
 !
 ! === Collet Data ===
-  call MPI_Reduce(c, a, NDIM, MPI_DOUBLE_PRECISION, &
+  call MPI_Reduce(atmp, a, NDIM, MPI_DOUBLE_PRECISION, &
  &                MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 !
-!
-! === MPI_Finalization ===
+! === Output Sample ===
   call MPI_Barrier(MPI_COMM_WORLD, ierr)
   if(myrank == 0) then
+     write(*,*) "a(NDIM)=",a(NDIM)
      write(*,*) "Successfully Done."
   endif
+!
+! === MPI_Finalization ===
   call MPI_Finalize(ierr)
 !
-  deallocate(a, b, c)
+  deallocate(a, b, atmp)
   stop
 
 9 continue

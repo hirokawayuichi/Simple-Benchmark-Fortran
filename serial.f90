@@ -1,4 +1,4 @@
-! _/_/_/ Simple Benchmark Program  Ver 2.0 _/_/_/
+! _/_/_/ Simple Benchmark Program  Ver 2.1 _/_/_/
 ! Copyright Y.Hirokawa
 
 program main
@@ -46,6 +46,9 @@ program main
 !$OMP BARRIER
   enddo
 !$ACC END DATA
+!
+! === Output Sample ===
+  write(*,*) "a(NDIM)=",a(NDIM)
 !
 ! === Free Allocated Memory ===
   deallocate(a, b)
