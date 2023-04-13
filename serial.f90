@@ -16,7 +16,6 @@ program main
   open(1,err=9,file='input.dat',status='old')
   read(1,NML=MAIN_PARM)
   close(1)
-  write(*,*) "[INFO] Ndim=",Ndim," Ntime=",Ntime, "Iseed=",Iseed
 !
 ! === Set Pseudo Random Number ===
   Iseed = 1
@@ -25,6 +24,8 @@ program main
   iarray(:) = Iseed
   call random_seed(put=iarray)
   deallocate(iarray)
+!
+  write(*,*) "[INFO] Ndim=",Ndim," Ntime=",Ntime, "Iseed=",Iseed
 !
 ! === Memory Allocation ===
   allocate(a(Ndim), b(Ndim))
